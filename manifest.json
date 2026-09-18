@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "id": "mpb.workspace-overview",
+  "name": "Workspace Overview",
+  "version": "0.1.0",
+  "author": "mpb",
+  "license": "MIT",
+  "description": "Four workspaces. Four keys. That's the map.",
+  "kinds": [
+    "overlay"
+  ],
+  "entryPoints": {
+    "overlay": "Overview.qml"
+  }
+}
