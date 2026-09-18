@@ -1,19 +1,23 @@
 # Workspace Overview
 
-Four workspaces. Four keys. That's the map.
+Omarchy is a keyboard system, and that's the point. But sometimes the laptop
+is on the couch, or you're just browsing, or you only have one hand free.
+Reaching for the mouse feels like giving up. The trackpad is already under
+your thumb.
 
-A fullscreen 2×2 overview of the workspaces you actually have open. Live
-miniatures of the real tile layout. Trackpad opens it. Number keys leave it.
+This plugin is for that. Four fingers across the pad moves you between
+workspaces. Three fingers does the tab things you'd otherwise chord. None of
+it asks you to hunt for a pointer.
 
-- **4-finger swipe up** or Super + the key left of `1` opens the map
-- **4-finger swipe down** or **Esc** closes it
-- **`1`–`0`** jump to that workspace
-- **Arrows** / **J K** move the selection; **Enter** goes
-- **Esc** closes without moving
-- More than four open workspaces? Scroll to the next row
+The other time it earns its keep is the opposite problem: two hands on the
+keyboard, and you still can't remember where you left something. Slack on 3?
+The browser on 2? Four fingers up — or Super and the key left of 1 — and you
+see the workspaces you actually have open, as they really look. Wallpaper in
+the gaps, windows in their real layout. You know what's where. Hit the number
+and you're there.
 
-Empty workspaces stay off the map. Scratchpads stay off the map. There are no
-settings.
+Empty desks stay off the map. Scratchpads too. If you've got more than four
+workspaces open, scroll. There's nothing to configure.
 
 ## Install
 
@@ -21,7 +25,7 @@ settings.
 omarchy plugin add https://github.com/markatdataandbeyond/omarchy-workspace-overview --enable
 ```
 
-Toggle it:
+Then add the binds below, or call it yourself:
 
 ```sh
 omarchy-shell shell toggle mpb.workspace-overview '{}'
@@ -48,11 +52,17 @@ hl.gesture({
 })
 ```
 
+Four fingers left/right can be Hyprland's built-in workspace swipe. Three-finger
+tab shortcuts are optional and live in the same file.
+
 In `~/.config/hypr/bindings.lua`:
 
 ```lua
 o.bind("SUPER + code:49", "Workspace overview", "omarchy-shell shell toggle mpb.workspace-overview '{}'")
 ```
+
+Once it's open: `1`–`0` jumps, arrows or J/K move, Enter goes, Esc or four
+fingers down closes.
 
 ## Requirements
 

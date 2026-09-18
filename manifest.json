@@ -5,7 +5,7 @@
   "version": "0.1.0",
   "author": "mpb",
   "license": "MIT",
-  "description": "Four workspaces. Four keys. That's the map.",
+  "description": "See which workspace you left something on — and get there from the trackpad when two hands on the keyboard isn't the point.",
   "kinds": [
     "overlay"
   ],
