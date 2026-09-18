@@ -5,7 +5,8 @@ Four workspaces. Four keys. That's the map.
 A fullscreen 2×2 overview of the workspaces you actually have open. Live
 miniatures of the real tile layout. Trackpad opens it. Number keys leave it.
 
-- **4-finger swipe up** or Super + the key left of `1` toggles the map
+- **4-finger swipe up** or Super + the key left of `1` opens the map
+- **4-finger swipe down** or **Esc** closes it
 - **`1`–`0`** jump to that workspace
 - **Arrows** / **J K** move the selection; **Enter** goes
 - **Esc** closes without moving
@@ -31,9 +32,20 @@ omarchy-shell shell toggle mpb.workspace-overview '{}'
 In `~/.config/hypr/input.lua`:
 
 ```lua
-hl.gesture({ fingers = 4, direction = "up", action = function()
-  hl.dispatch(hl.dsp.exec_cmd("omarchy-shell shell toggle mpb.workspace-overview '{}'"))
-end })
+hl.gesture({
+  fingers = 4,
+  direction = "up",
+  action = function()
+    hl.dispatch(hl.dsp.exec_cmd("omarchy-shell shell summon mpb.workspace-overview '{}'"))
+  end,
+})
+hl.gesture({
+  fingers = 4,
+  direction = "down",
+  action = function()
+    hl.dispatch(hl.dsp.exec_cmd("omarchy-shell shell hide mpb.workspace-overview"))
+  end,
+})
 ```
 
 In `~/.config/hypr/bindings.lua`:
