@@ -52,34 +52,43 @@ BorderSurface {
     onWheelMoved: function (pixelY, angleY) { root.wheelMoved(pixelY, angleY) }
   }
 
-  Text {
+  Item {
+    id: chrome
     anchors.top: parent.top
     anchors.left: parent.left
-    anchors.margins: Style.space(12)
-    text: {
-      if (!root.cell)
-        return ""
-      return String(root.cell.workspaceId === 10 ? 0 : root.cell.workspaceId)
-    }
-    color: root.cell && root.cell.focused ? Color.accent : Color.menu.text
-    opacity: 0.28
-    font.family: Style.font.family
-    font.pixelSize: Style.font.displayLarge
-    font.bold: true
-    z: 2
-  }
-
-  Text {
-    visible: !!(root.cell && root.cell.monitorName && root.cell.monitorName !== root.overlayMonitorName)
-    anchors.top: parent.top
     anchors.right: parent.right
-    anchors.margins: Style.space(12)
-    text: root.cell ? String(root.cell.monitorName || "") : ""
-    color: Color.menu.text
-    opacity: 0.45
-    font.family: Style.font.family
-    font.pixelSize: Style.font.caption
+    anchors.topMargin: Style.space(14)
+    anchors.leftMargin: Style.space(22)
+    anchors.rightMargin: Style.space(14)
+    height: deskLabel.implicitHeight
     z: 2
+
+    Text {
+      id: deskLabel
+      anchors.left: parent.left
+      anchors.verticalCenter: parent.verticalCenter
+      text: {
+        if (!root.cell)
+          return ""
+        return String(root.cell.workspaceId === 10 ? 0 : root.cell.workspaceId)
+      }
+      color: root.cell && root.cell.focused ? Color.accent : Color.menu.text
+      opacity: 0.5
+      font.family: Style.font.family
+      font.pixelSize: Style.font.heading
+      font.bold: true
+    }
+
+    Text {
+      visible: !!(root.cell && root.cell.monitorName && root.cell.monitorName !== root.overlayMonitorName)
+      anchors.right: parent.right
+      anchors.verticalCenter: parent.verticalCenter
+      text: root.cell ? String(root.cell.monitorName || "") : ""
+      color: Color.menu.text
+      opacity: 0.45
+      font.family: Style.font.family
+      font.pixelSize: Style.font.caption
+    }
   }
 
   Item {
