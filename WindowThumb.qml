@@ -10,6 +10,7 @@ Item {
   property bool showTitle: false
 
   signal activated()
+  signal wheelMoved(real pixelY, real angleY)
 
   clip: true
 
@@ -51,11 +52,8 @@ Item {
     }
   }
 
-  MouseArea {
-    anchors.fill: parent
-    onClicked: function (mouse) {
-      root.activated()
-      mouse.accepted = true
-    }
+  WheelArea {
+    onActivated: root.activated()
+    onWheelMoved: function (pixelY, angleY) { root.wheelMoved(pixelY, angleY) }
   }
 }

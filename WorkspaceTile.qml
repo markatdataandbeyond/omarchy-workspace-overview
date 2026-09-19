@@ -14,6 +14,7 @@ BorderSurface {
 
   signal activateWorkspace()
   signal activateWindow(string address)
+  signal wheelMoved(real pixelY, real angleY)
 
   readonly property string backgroundPath: Quickshell.env("HOME") + "/.local/state/omarchy/current/background"
 
@@ -46,9 +47,9 @@ BorderSurface {
     return null
   }
 
-  MouseArea {
-    anchors.fill: parent
-    onClicked: root.activateWorkspace()
+  WheelArea {
+    onActivated: root.activateWorkspace()
+    onWheelMoved: function (pixelY, angleY) { root.wheelMoved(pixelY, angleY) }
   }
 
   Text {
@@ -108,6 +109,7 @@ BorderSurface {
         live: root.live
         showTitle: root.selected
         onActivated: root.activateWindow(modelData.address)
+        onWheelMoved: function (pixelY, angleY) { root.wheelMoved(pixelY, angleY) }
       }
     }
   }

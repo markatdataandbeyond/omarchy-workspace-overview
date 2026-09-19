@@ -30,6 +30,12 @@ function workspaceFocusDispatch(workspaceId) {
   return "hl.dsp.focus({ workspace = tostring(" + id + ") })"
 }
 
+function exposeWorkspaceIds(openIds, liveIds) {
+  if (openIds && openIds.length > 0)
+    return openIds.slice()
+  return liveIds ? liveIds.slice() : []
+}
+
 function occupiedWorkspaceIds(workspaces) {
   var list = []
   for (var i = 0; i < (workspaces ? workspaces.length : 0); i++) {
@@ -47,6 +53,118 @@ function occupiedWorkspaceIds(workspaces) {
 
 function pageSize() {
   return GRID_COLUMNS * VISIBLE_ROWS
+}
+
+function mapContentHeight(count, cellHeight, gap) {
+  var rows = rowCount(count)
+  if (rows <= 0) return 0
+  return rows * (Number(cellHeight) + Number(gap)) - Number(gap)
+}
+
+function clampScrollY(y, contentHeight, viewportHeight) {
+  var maxY = Math.max(0, Number(contentHeight) - Number(viewportHeight))
+  var value = Number(y)
+  if (!isFinite(value) || value < 0) return 0
+  if (value > maxY) return maxY
+  return value
+}
+
+function applyWheel(contentY, deltaY, contentHeight, viewportHeight) {
+  return clampScrollY(Number(contentY) + Number(deltaY), contentHeight, viewportHeight)
+}
+
+function revealScrollY(index, contentY, cellHeight, gap, contentHeight, viewportHeight) {
+  var rowHeight = Number(cellHeight) + Number(gap)
+  var row = Math.floor(Number(index) / GRID_COLUMNS)
+  var top = row * rowHeight
+  var next = Number(contentY)
+  var view = Number(viewportHeight)
+  if (top < next)
+    next = top
+  else if (top + Number(cellHeight) > next + view)
+    next = top + Number(cellHeight) - view
+  return snapScrollY(next, cellHeight, gap, contentHeight, viewportHeight, 0)
+}
+
+function monitorCanvas(monitor) {
+  if (!monitor)
+    return { x: 0, y: 0, width: 0, height: 0 }
+  var ipc = monitor.lastIpcObject || {}
+  var width = Number(monitor.width !== undefined ? monitor.width : ipc.width) || 0
+  var height = Number(monitor.height !== undefined ? monitor.height : ipc.height) || 0
+  if (width <= 0 || height <= 0) {
+    width = Number(ipc.width) || 0
+    height = Number(ipc.height) || 0
+  }
+  return {
+    x: Number(monitor.x !== undefined ? monitor.x : ipc.x) || 0,
+    y: Number(monitor.y !== undefined ? monitor.y : ipc.y) || 0,
+    width: width,
+    height: height
+  }
+}
+
+function windowFromToplevel(toplevel) {
+  if (!toplevel)
+    return null
+  var parsed = windowFromIpc(toplevel.lastIpcObject || null)
+  if (parsed)
+    return parsed
+  return windowFromIpc({
+    address: toplevel.address,
+    at: [0, 0],
+    size: [1, 1],
+    title: toplevel.title
+  })
+}
+
+function windowsFromToplevels(toplevels) {
+  var out = []
+  for (var i = 0; i < (toplevels ? toplevels.length : 0); i++) {
+    var parsed = windowFromToplevel(toplevels[i])
+    if (parsed)
+      out.push(parsed)
+  }
+  return out
+}
+
+function snapScrollY(contentY, cellHeight, gap, contentHeight, viewportHeight, direction) {
+  var rowHeight = Number(cellHeight) + Number(gap)
+  var y = clampScrollY(contentY, contentHeight, viewportHeight)
+  var maxY = Math.max(0, Number(contentHeight) - Number(viewportHeight))
+  if (!isFinite(rowHeight) || rowHeight <= 0 || maxY <= 0)
+    return 0
+  var current = y / rowHeight
+  var dir = Number(direction)
+  var row
+  if (dir > 0)
+    row = Math.ceil(current - 1e-6)
+  else if (dir < 0)
+    row = Math.floor(current + 1e-6)
+  else
+    row = Math.round(current)
+  if (row < 0)
+    row = 0
+  var snapped = clampScrollY(row * rowHeight, contentHeight, viewportHeight)
+  return snapped === 0 ? 0 : snapped
+}
+
+function stepScrollY(contentY, cellHeight, gap, contentHeight, viewportHeight, steps) {
+  var rowHeight = Number(cellHeight) + Number(gap)
+  var current = snapScrollY(contentY, cellHeight, gap, contentHeight, viewportHeight, 0)
+  if (!isFinite(rowHeight) || rowHeight <= 0)
+    return current
+  return clampScrollY(current + Number(steps) * rowHeight, contentHeight, viewportHeight)
+}
+
+function wheelDelta(pixelY, angleY) {
+  var pixel = Number(pixelY)
+  var angle = Number(angleY)
+  if (isFinite(pixel) && Math.abs(pixel) >= 1)
+    return -pixel
+  if (isFinite(angle) && angle !== 0)
+    return -(angle / 4)
+  return 0
 }
 
 function rowCount(n) {
@@ -228,7 +346,18 @@ if (typeof module !== "undefined") {
     focusDispatch: focusDispatch,
     workspaceFocusDispatch: workspaceFocusDispatch,
     occupiedWorkspaceIds: occupiedWorkspaceIds,
+    exposeWorkspaceIds: exposeWorkspaceIds,
     pageSize: pageSize,
+    mapContentHeight: mapContentHeight,
+    clampScrollY: clampScrollY,
+    applyWheel: applyWheel,
+    revealScrollY: revealScrollY,
+    monitorCanvas: monitorCanvas,
+    windowFromToplevel: windowFromToplevel,
+    windowsFromToplevels: windowsFromToplevels,
+    snapScrollY: snapScrollY,
+    stepScrollY: stepScrollY,
+    wheelDelta: wheelDelta,
     rowCount: rowCount,
     pageCount: pageCount,
     pageForIndex: pageForIndex,

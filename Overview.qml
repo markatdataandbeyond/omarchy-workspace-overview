@@ -6,7 +6,7 @@ import qs.Commons
 import qs.Ui
 import "model/OverviewModel.js" as OverviewModel
 
-// Fullscreen 2x2 workspace map. Trackpad opens it; number keys leave it.
+// Fullscreen 2x2 map of the occupied workspaces.
 Item {
   id: root
 
@@ -19,33 +19,21 @@ Item {
   property bool closingFromHost: false
   property var targetScreen: null
   property int selectedIndex: -1
+  property var workspaceIds: []
+  property double lastStepAt: 0
 
   readonly property real mapScale: root.opened && !root.entering ? 1 : 1.12
   readonly property real mapOpacity: root.opened && !root.entering ? 1 : 0
   readonly property int hintHeight: Style.space(36)
   readonly property real mapMargin: Style.space(36)
   readonly property real cellGap: Style.space(18)
+  readonly property real mapWidth: Math.max(1, panel.width - root.mapMargin * 2)
+  readonly property real mapHeight: Math.max(1, panel.height - root.mapMargin * 2 - root.hintHeight)
+  readonly property real cellWidth: (mapWidth - root.cellGap) / OverviewModel.GRID_COLUMNS
+  readonly property real cellHeight: (mapHeight - root.cellGap) / OverviewModel.VISIBLE_ROWS
 
   function pluginId() {
     return (root.manifest && root.manifest.id) ? root.manifest.id : "mpb.workspace-overview"
-  }
-
-  function canvasFromMonitor(monitor) {
-    if (!monitor)
-      return { x: 0, y: 0, width: 0, height: 0 }
-    var ipc = monitor.lastIpcObject || {}
-    var width = Number(monitor.width !== undefined ? monitor.width : ipc.width) || 0
-    var height = Number(monitor.height !== undefined ? monitor.height : ipc.height) || 0
-    if (width <= 0 || height <= 0) {
-      width = Number(ipc.width) || 0
-      height = Number(ipc.height) || 0
-    }
-    return {
-      x: Number(monitor.x !== undefined ? monitor.x : ipc.x) || 0,
-      y: Number(monitor.y !== undefined ? monitor.y : ipc.y) || 0,
-      width: width,
-      height: height
-    }
   }
 
   function targetScreenForOpen() {
@@ -61,71 +49,89 @@ Item {
     return screens.length > 0 ? screens[0] : null
   }
 
-  readonly property var workspaceCells: {
+  function liveOccupiedIds() {
     var workspaces = Hyprland.workspaces ? Hyprland.workspaces.values : []
     var raw = []
-    var byId = {}
     for (var i = 0; i < workspaces.length; i++) {
       var workspace = workspaces[i]
       if (!workspace)
         continue
       var toplevels = workspace.toplevels ? workspace.toplevels.values : []
       raw.push({ id: workspace.id, windowCount: toplevels.length })
-      byId[workspace.id] = { workspace: workspace, toplevels: toplevels }
     }
+    return OverviewModel.occupiedWorkspaceIds(raw)
+  }
 
-    var ids = OverviewModel.occupiedWorkspaceIds(raw)
-    var cells = []
-    for (var j = 0; j < ids.length; j++) {
-      var pack = byId[ids[j]]
-      var windows = []
-      for (var k = 0; k < pack.toplevels.length; k++) {
-        var toplevel = pack.toplevels[k]
-        var parsed = OverviewModel.windowFromIpc(toplevel && toplevel.lastIpcObject ? toplevel.lastIpcObject : null)
-        if (!parsed && toplevel)
-          parsed = OverviewModel.windowFromIpc({
-            address: toplevel.address,
-            at: [0, 0],
-            size: [1, 1],
-            title: toplevel.title
-          })
-        if (parsed)
-          windows.push(parsed)
-      }
-      var monitor = pack.workspace.monitor
-      cells.push({
-        workspaceId: ids[j],
-        focused: !!pack.workspace.focused,
-        monitorName: monitor ? String(monitor.name || "") : "",
-        canvas: root.canvasFromMonitor(monitor),
-        toplevels: pack.toplevels,
-        windows: windows
-      })
+  function snapshotDesks() {
+    root.workspaceIds = OverviewModel.exposeWorkspaceIds([], root.liveOccupiedIds())
+  }
+
+  function workspaceById(workspaceId) {
+    var workspaces = Hyprland.workspaces ? Hyprland.workspaces.values : []
+    var want = Number(workspaceId)
+    for (var i = 0; i < workspaces.length; i++) {
+      if (workspaces[i] && Number(workspaces[i].id) === want)
+        return workspaces[i]
     }
-    return cells
+    return null
+  }
+
+  function cellForWorkspace(workspaceId) {
+    var workspace = root.workspaceById(workspaceId)
+    if (!workspace) {
+      return {
+        workspaceId: Number(workspaceId),
+        focused: false,
+        monitorName: "",
+        canvas: OverviewModel.monitorCanvas(null),
+        toplevels: [],
+        windows: []
+      }
+    }
+    var toplevels = workspace.toplevels ? workspace.toplevels.values : []
+    var monitor = workspace.monitor
+    return {
+      workspaceId: Number(workspaceId),
+      focused: !!workspace.focused,
+      monitorName: monitor ? String(monitor.name || "") : "",
+      canvas: OverviewModel.monitorCanvas(monitor),
+      toplevels: toplevels,
+      windows: OverviewModel.windowsFromToplevels(toplevels)
+    }
   }
 
   function indexOfFocused() {
-    for (var i = 0; i < root.workspaceCells.length; i++) {
-      if (root.workspaceCells[i].focused)
+    for (var i = 0; i < root.workspaceIds.length; i++) {
+      var workspace = root.workspaceById(root.workspaceIds[i])
+      if (workspace && workspace.focused)
         return i
     }
-    return root.workspaceCells.length > 0 ? 0 : -1
+    return root.workspaceIds.length > 0 ? 0 : -1
   }
 
   function open(payloadJson) {
     root.targetScreen = root.targetScreenForOpen()
     root.entering = true
+    root.workspaceIds = []
     Hyprland.refreshWorkspaces()
     Hyprland.refreshToplevels()
+    root.snapshotDesks()
     root.selectedIndex = root.indexOfFocused()
     root.opened = true
-    Qt.callLater(function () {
-      root.entering = false
-      if (root.opened)
-        keyCatcher.forceActiveFocus()
-      root.revealIndex(root.selectedIndex)
-    })
+    Qt.callLater(root.finishOpen)
+  }
+
+  function finishOpen() {
+    if (!root.opened)
+      return
+    root.snapshotDesks()
+    root.selectedIndex = root.indexOfFocused()
+    root.entering = false
+    root.lastStepAt = 0
+    if (scroller)
+      scroller.contentY = 0
+    keyCatcher.forceActiveFocus()
+    root.revealIndex(root.selectedIndex)
   }
 
   function close() {
@@ -134,6 +140,7 @@ Item {
     root.entering = false
     root.targetScreen = null
     root.selectedIndex = -1
+    root.workspaceIds = []
     root.closingFromHost = false
   }
 
@@ -168,33 +175,73 @@ Item {
   }
 
   function activateSelected() {
-    if (root.selectedIndex < 0 || root.selectedIndex >= root.workspaceCells.length)
+    if (root.selectedIndex < 0 || root.selectedIndex >= root.workspaceIds.length)
       return
-    root.focusWorkspace(root.workspaceCells[root.selectedIndex].workspaceId)
+    root.focusWorkspace(root.workspaceIds[root.selectedIndex])
   }
 
   function moveSelection(dx, dy) {
-    root.selectedIndex = OverviewModel.moveIndex(root.selectedIndex, dx, dy, root.workspaceCells.length)
+    root.selectedIndex = OverviewModel.moveIndex(root.selectedIndex, dx, dy, root.workspaceIds.length)
     root.revealIndex(root.selectedIndex)
   }
 
   function revealIndex(index) {
     if (!scroller || index < 0)
       return
-    var row = Math.floor(index / OverviewModel.GRID_COLUMNS)
-    var rowHeight = cellHeight + root.cellGap
-    var top = row * rowHeight
-    var bottom = top + cellHeight
-    if (top < scroller.contentY)
-      scroller.contentY = Math.max(0, top)
-    else if (bottom > scroller.contentY + scroller.height)
-      scroller.contentY = Math.max(0, bottom - scroller.height)
+    scroller.contentY = OverviewModel.revealScrollY(
+      index,
+      scroller.contentY,
+      root.cellHeight,
+      root.cellGap,
+      scroller.contentHeight,
+      scroller.height
+    )
   }
 
-  readonly property real mapWidth: Math.max(1, panel.width - root.mapMargin * 2)
-  readonly property real mapHeight: Math.max(1, panel.height - root.mapMargin * 2 - root.hintHeight)
-  readonly property real cellWidth: (mapWidth - root.cellGap) / OverviewModel.GRID_COLUMNS
-  readonly property real cellHeight: (mapHeight - root.cellGap) / OverviewModel.VISIBLE_ROWS
+  function scrollByWheel(pixelY, angleY) {
+    var delta = OverviewModel.wheelDelta(pixelY, angleY)
+    if (delta === 0)
+      return
+    var now = Date.now()
+    if (now - root.lastStepAt < 180)
+      return
+    root.lastStepAt = now
+    scroller.contentY = OverviewModel.stepScrollY(
+      scroller.contentY,
+      root.cellHeight,
+      root.cellGap,
+      scroller.contentHeight,
+      scroller.height,
+      delta > 0 ? 1 : -1
+    )
+  }
+
+  function handleKey(event) {
+    if (event.key === Qt.Key_Escape) {
+      root.requestClose()
+    } else if (event.key === Qt.Key_Left) {
+      root.moveSelection(-1, 0)
+    } else if (event.key === Qt.Key_Right) {
+      root.moveSelection(1, 0)
+    } else if (event.key === Qt.Key_Up || event.key === Qt.Key_K) {
+      root.moveSelection(0, -1)
+    } else if (event.key === Qt.Key_Down || event.key === Qt.Key_J) {
+      root.moveSelection(0, 1)
+    } else if (event.key === Qt.Key_PageUp) {
+      root.selectedIndex = OverviewModel.pageUp(root.selectedIndex, root.workspaceIds.length)
+      root.revealIndex(root.selectedIndex)
+    } else if (event.key === Qt.Key_PageDown) {
+      root.selectedIndex = OverviewModel.pageDown(root.selectedIndex, root.workspaceIds.length)
+      root.revealIndex(root.selectedIndex)
+    } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
+      root.activateSelected()
+    } else if (event.text >= "0" && event.text <= "9") {
+      root.focusWorkspace(OverviewModel.workspaceIdFromDigit(event.text))
+    } else {
+      return
+    }
+    event.accepted = true
+  }
 
   Connections {
     target: Quickshell
@@ -227,9 +274,9 @@ Item {
       opacity: root.mapOpacity
     }
 
-    MouseArea {
-      anchors.fill: parent
-      onClicked: root.requestClose()
+    WheelArea {
+      onActivated: root.requestClose()
+      onWheelMoved: function (pixelY, angleY) { root.scrollByWheel(pixelY, angleY) }
     }
 
     Item {
@@ -247,41 +294,9 @@ Item {
         NumberAnimation { duration: 220; easing.type: Easing.OutCubic }
       }
 
-      Keys.onPressed: function (event) {
-        if (event.key === Qt.Key_Escape) {
-          root.requestClose()
-          event.accepted = true
-        } else if (event.key === Qt.Key_Left) {
-          root.moveSelection(-1, 0)
-          event.accepted = true
-        } else if (event.key === Qt.Key_Right) {
-          root.moveSelection(1, 0)
-          event.accepted = true
-        } else if (event.key === Qt.Key_Up || event.key === Qt.Key_K) {
-          root.moveSelection(0, -1)
-          event.accepted = true
-        } else if (event.key === Qt.Key_Down || event.key === Qt.Key_J) {
-          root.moveSelection(0, 1)
-          event.accepted = true
-        } else if (event.key === Qt.Key_PageUp) {
-          root.selectedIndex = OverviewModel.pageUp(root.selectedIndex, root.workspaceCells.length)
-          root.revealIndex(root.selectedIndex)
-          event.accepted = true
-        } else if (event.key === Qt.Key_PageDown) {
-          root.selectedIndex = OverviewModel.pageDown(root.selectedIndex, root.workspaceCells.length)
-          root.revealIndex(root.selectedIndex)
-          event.accepted = true
-        } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
-          root.activateSelected()
-          event.accepted = true
-        } else if (event.text >= "0" && event.text <= "9") {
-          var workspaceId = OverviewModel.workspaceIdFromDigit(event.text)
-          root.focusWorkspace(workspaceId)
-          event.accepted = true
-        }
-      }
+      Keys.onPressed: root.handleKey
 
-      Flickable {
+      Item {
         id: scroller
         anchors.left: parent.left
         anchors.right: parent.right
@@ -291,47 +306,46 @@ Item {
         anchors.topMargin: root.mapMargin
         height: root.mapHeight
         clip: true
-        boundsBehavior: Flickable.StopAtBounds
-        flickDeceleration: 3500
-        interactive: root.workspaceCells.length > OverviewModel.pageSize()
-        contentWidth: width
-        contentHeight: Math.max(
+
+        property real contentY: 0
+        readonly property real contentHeight: Math.max(
           height,
-          Math.ceil(root.workspaceCells.length / OverviewModel.GRID_COLUMNS) * (root.cellHeight + root.cellGap) - root.cellGap
+          OverviewModel.mapContentHeight(root.workspaceIds.length, root.cellHeight, root.cellGap)
         )
 
-        Grid {
-          id: workspaceGrid
-          width: parent.width
-          columns: OverviewModel.GRID_COLUMNS
-          columnSpacing: root.cellGap
-          rowSpacing: root.cellGap
-
-          Repeater {
-            model: root.workspaceCells
-
-            WorkspaceTile {
-              required property var modelData
-              required property int index
-              width: root.cellWidth
-              height: root.cellHeight
-              cell: modelData
-              selected: root.selectedIndex === index
-              live: root.opened
-              overlayMonitorName: root.targetScreen ? String(root.targetScreen.name || "") : ""
-              onActivateWorkspace: root.focusWorkspace(modelData.workspaceId)
-              onActivateWindow: function (address) { root.focusWindow(address) }
-            }
-          }
+        Behavior on contentY {
+          NumberAnimation { duration: 200; easing.type: Easing.OutCubic }
         }
 
-        onMovementEnded: {
-          var rowHeight = root.cellHeight + root.cellGap
-          if (rowHeight <= 0)
-            return
-          var row = Math.round(scroller.contentY / rowHeight)
-          var maxY = Math.max(0, scroller.contentHeight - scroller.height)
-          scroller.contentY = Math.max(0, Math.min(maxY, row * rowHeight))
+        Item {
+          width: parent.width
+          height: scroller.contentHeight
+          y: -scroller.contentY
+
+          Grid {
+            width: parent.width
+            columns: OverviewModel.GRID_COLUMNS
+            columnSpacing: root.cellGap
+            rowSpacing: root.cellGap
+
+            Repeater {
+              model: root.workspaceIds
+
+              WorkspaceTile {
+                required property int modelData
+                required property int index
+                width: root.cellWidth
+                height: root.cellHeight
+                cell: root.cellForWorkspace(modelData)
+                selected: root.selectedIndex === index
+                live: root.opened
+                overlayMonitorName: root.targetScreen ? String(root.targetScreen.name || "") : ""
+                onActivateWorkspace: root.focusWorkspace(modelData)
+                onActivateWindow: function (address) { root.focusWindow(address) }
+                onWheelMoved: function (pixelY, angleY) { root.scrollByWheel(pixelY, angleY) }
+              }
+            }
+          }
         }
       }
 
@@ -339,7 +353,9 @@ Item {
         anchors.horizontalCenter: parent.horizontalCenter
         anchors.bottom: parent.bottom
         anchors.bottomMargin: Style.space(14)
-        text: "1–0 go  ·  arrows move  ·  Esc close"
+        text: root.workspaceIds.length > OverviewModel.pageSize()
+          ? "1–0 go  ·  scroll for more  ·  Esc close"
+          : "1–0 go  ·  arrows move  ·  Esc close"
         color: Color.menu.text
         opacity: 0.42
         font.family: Style.font.family

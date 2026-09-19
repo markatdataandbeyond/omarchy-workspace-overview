@@ -6,5 +6,5 @@ for t in test/*.test.js; do
   node "$t"
 done
 omarchy plugin validate .
-/usr/lib/qt6/bin/qmllint -I "$OMARCHY_SOURCE/shell" Overview.qml WorkspaceTile.qml WindowThumb.qml
+/usr/lib/qt6/bin/qmllint -I "$OMARCHY_SOURCE/shell" Overview.qml WorkspaceTile.qml WindowThumb.qml WheelArea.qml
 echo "ok - workspace overview"
