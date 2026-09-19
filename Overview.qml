@@ -235,10 +235,15 @@ Item {
       root.revealIndex(root.selectedIndex)
     } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
       root.activateSelected()
-    } else if (event.text >= "0" && event.text <= "9") {
-      root.focusWorkspace(OverviewModel.workspaceIdFromDigit(event.text))
     } else {
-      return
+      var workspaceId = OverviewModel.workspaceIdFromKeyCode(event.key)
+      if (workspaceId === 0 && event.key >= Qt.Key_Keypad0 && event.key <= Qt.Key_Keypad9)
+        workspaceId = event.key === Qt.Key_Keypad0 ? 10 : (event.key - Qt.Key_Keypad0)
+      if (workspaceId === 0)
+        workspaceId = OverviewModel.workspaceIdFromDigit(event.text)
+      if (workspaceId === 0)
+        return
+      root.focusWorkspace(workspaceId)
     }
     event.accepted = true
   }
@@ -267,6 +272,10 @@ Item {
     WlrLayershell.layer: WlrLayer.Overlay
     WlrLayershell.keyboardFocus: root.opened ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
     exclusionMode: ExclusionMode.Ignore
+    onVisibleChanged: {
+      if (visible)
+        Qt.callLater(function () { keyCatcher.forceActiveFocus() })
+    }
 
     Rectangle {
       anchors.fill: parent
@@ -283,6 +292,7 @@ Item {
       id: keyCatcher
       anchors.fill: parent
       focus: true
+      Keys.priority: Keys.BeforeItem
       opacity: root.mapOpacity
       scale: root.mapScale
       transformOrigin: Item.Center
@@ -294,7 +304,7 @@ Item {
         NumberAnimation { duration: 220; easing.type: Easing.OutCubic }
       }
 
-      Keys.onPressed: root.handleKey
+      Keys.onPressed: function (event) { root.handleKey(event) }
 
       Item {
         id: scroller

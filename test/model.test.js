@@ -115,6 +115,10 @@ assert.deepEqual(model.windowsFromToplevels([
 assert.equal(model.workspaceIdFromDigit('1'), 1)
 assert.equal(model.workspaceIdFromDigit('0'), 10)
 assert.equal(model.workspaceIdFromDigit('a'), 0)
+assert.equal(model.workspaceIdFromKeyCode(49), 1)
+assert.equal(model.workspaceIdFromKeyCode(50), 2)
+assert.equal(model.workspaceIdFromKeyCode(48), 10)
+assert.equal(model.workspaceIdFromKeyCode(0), 0)
 
 // ---- miniature geometry: real layout, monitor-relative ----------------------
 

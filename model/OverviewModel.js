@@ -229,6 +229,13 @@ function workspaceIdFromDigit(text) {
   return 0
 }
 
+function workspaceIdFromKeyCode(key) {
+  var code = Number(key)
+  if (code === 48) return 10
+  if (code >= 49 && code <= 57) return code - 48
+  return 0
+}
+
 function windowFromIpc(ipc) {
   if (!ipc || typeof ipc !== "object") return null
   var at = ipc.at || []
@@ -367,6 +374,7 @@ if (typeof module !== "undefined") {
     pageDown: pageDown,
     pageUp: pageUp,
     workspaceIdFromDigit: workspaceIdFromDigit,
+    workspaceIdFromKeyCode: workspaceIdFromKeyCode,
     windowFromIpc: windowFromIpc,
     layoutWindows: layoutWindows
   }
