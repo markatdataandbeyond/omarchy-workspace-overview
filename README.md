@@ -16,7 +16,7 @@ see the workspaces you actually have open, as they really look. Wallpaper in
 the gaps, windows in their real layout. You know what's where. Hit the number
 and you're there.
 
-![Four open workspaces in a 2×2 map, with live window miniatures and the wallpaper in the gaps.](overview.png)
+![Four open workspaces in a 2×2 map, with live window miniatures and the wallpaper in the gaps.](overview.jpg)
 
 Empty desks stay off the map. Scratchpads too. If you've got more than four
 workspaces open, scroll. There's nothing to configure.
