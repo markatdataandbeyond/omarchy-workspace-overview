@@ -66,6 +66,15 @@ o.bind("SUPER + code:49", "Workspace overview", "omarchy-shell shell toggle mpb.
 Once it's open: `1`–`0` jumps, arrows or J/K move, Enter goes, Esc or four
 fingers down closes.
 
+## Remove
+
+```sh
+omarchy plugin remove mpb.workspace-overview
+```
+
+That disables the plugin and deletes the checkout. Hyprland binds stay until you
+delete them yourself.
+
 ## Requirements
 
 Hyprland with `hyprland_toplevel_export_manager_v1` and Omarchy's Lua config
